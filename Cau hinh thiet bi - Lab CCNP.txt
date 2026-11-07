@@ -1,0 +1,689 @@
+﻿!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! LỆNH CẤU HÌNH TẤT CẢ THIẾT BỊ
+! File gốc: Lab Tong hop kien thuc CCNP - advance - Hang.pkt (Packet Tracer 8.2.2)
+! Trích từ running-config trong file .pkt; đã bỏ các dòng mặc định
+! (duplex/speed auto, version, license udi, line ... login, interface trống)
+! Có thể copy từng khối và dán thẳng vào CLI của thiết bị tương ứng.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!#####################################################################
+! PHẦN 1: MẠNG ISP (eBGP)
+!#####################################################################
+
+!=====================================================================
+! THIẾT BỊ: ISP-R1  (Router 2911 - BGP AS 65500)
+!=====================================================================
+enable
+configure terminal
+!
+hostname ISP-R1
+interface GigabitEthernet0/0
+ description TO_ISP-R2
+ ip address 201.165.0.1 255.255.255.252
+!
+interface GigabitEthernet0/1
+ description TO_ISP-R3
+ ip address 201.165.1.1 255.255.255.252
+!
+interface GigabitEthernet0/2
+ description TO_BQP-HN-R1
+ ip address 201.165.5.2 255.255.255.252
+!
+router bgp 65500
+ bgp router-id 1.1.1.1
+ neighbor 201.165.0.2 remote-as 65501
+ neighbor 201.165.1.2 remote-as 65503
+ network 201.165.0.0 mask 255.255.255.252
+ network 201.165.1.0 mask 255.255.255.252
+ network 201.165.5.0 mask 255.255.255.252
+!
+end
+write memory
+
+!=====================================================================
+! THIẾT BỊ: ISP-R2  (Router 2911 - BGP AS 65501)
+!=====================================================================
+enable
+configure terminal
+!
+hostname ISP-R2
+interface GigabitEthernet0/0
+ description TO_ISP-R1
+ ip address 201.165.0.2 255.255.255.252
+!
+interface GigabitEthernet0/1
+ description TO_ISP-R4
+ ip address 201.165.3.1 255.255.255.252
+!
+interface GigabitEthernet0/2
+ description TO_BQP-BG-R1
+ ip address 201.165.4.1 255.255.255.252
+!
+router bgp 65501
+ bgp router-id 2.2.2.2
+ neighbor 201.165.0.1 remote-as 65500
+ neighbor 201.165.3.2 remote-as 65502
+ network 201.165.0.0 mask 255.255.255.252
+ network 201.165.3.0 mask 255.255.255.252
+ network 201.165.4.0 mask 255.255.255.252
+!
+end
+write memory
+
+!=====================================================================
+! THIẾT BỊ: ISP-R3  (Router 2911 - BGP AS 65503)
+!=====================================================================
+enable
+configure terminal
+!
+hostname ISP-R3
+interface GigabitEthernet0/0
+ description TO_ISP-R4
+ ip address 201.165.2.1 255.255.255.252
+!
+interface GigabitEthernet0/1
+ description TO_ISP-R1
+ ip address 201.165.1.2 255.255.255.252
+!
+interface GigabitEthernet0/2
+ description TO_BQP-HN-R2
+ ip address 201.165.6.2 255.255.255.252
+!
+router bgp 65503
+ bgp router-id 3.3.3.3
+ neighbor 201.165.1.1 remote-as 65500
+ neighbor 201.165.2.2 remote-as 65502
+ network 201.165.1.0 mask 255.255.255.252
+ network 201.165.2.0 mask 255.255.255.252
+ network 201.165.6.0 mask 255.255.255.252
+!
+end
+write memory
+
+!=====================================================================
+! THIẾT BỊ: ISP-R4  (Router 2911 - BGP AS 65502)
+!=====================================================================
+enable
+configure terminal
+!
+hostname ISP-R4
+interface GigabitEthernet0/0
+ description TO_ISP-R3
+ ip address 201.165.2.2 255.255.255.252
+!
+interface GigabitEthernet0/1
+ description TO_ISP-R2
+ ip address 201.165.3.2 255.255.255.252
+!
+interface GigabitEthernet0/2
+ description TO_GOOGLE-R1
+ ip address 8.8.8.1 255.255.255.0
+!
+router bgp 65502
+ bgp router-id 4.4.4.4
+ neighbor 201.165.2.1 remote-as 65503
+ neighbor 201.165.3.1 remote-as 65501
+ network 201.165.2.0 mask 255.255.255.252
+ network 201.165.3.0 mask 255.255.255.252
+ network 8.8.8.0 mask 255.255.255.0
+!
+end
+write memory
+
+!#####################################################################
+! PHẦN 2: GOOGLE (Static NAT theo port)
+!#####################################################################
+
+!=====================================================================
+! THIẾT BỊ: Google-R1  (Router 2911)
+!=====================================================================
+enable
+configure terminal
+!
+hostname Google-R1
+interface GigabitEthernet0/0
+ description WAN_TO_ISP-R4
+ ip address 8.8.8.2 255.255.255.0
+ ip nat outside
+!
+interface GigabitEthernet0/1
+ description LAN_TO_SERVERS
+ ip address 192.168.0.1 255.255.255.0
+ ip nat inside
+!
+interface GigabitEthernet0/2
+ no ip address
+ shutdown
+!
+ip nat inside source static udp 192.168.0.10 53 8.8.8.8 53
+ip nat inside source static tcp 192.168.0.10 53 8.8.8.8 53
+ip nat inside source static tcp 192.168.0.20 25 8.8.8.9 25
+ip nat inside source static tcp 192.168.0.20 110 8.8.8.9 110
+ip nat inside source static tcp 192.168.0.30 443 8.8.8.9 443
+ip route 0.0.0.0 0.0.0.0 8.8.8.1
+end
+write memory
+
+!=====================================================================
+! THIẾT BỊ: Google-Acc  (Switch 2960-24TT)
+!=====================================================================
+! Switch không cần cấu hình gì thêm (mọi cổng mặc định VLAN 1).
+! Trong file gốc hostname vẫn để mặc định là "Switch"; ở đây đặt là Google-Acc.
+enable
+configure terminal
+!
+hostname Google-Acc
+end
+write memory
+
+!=====================================================================
+! SERVER (cấu hình bằng GUI trong Packet Tracer - tab Config / Services)
+!=====================================================================
+! DNS        : IP 192.168.0.10 /24, Gateway 192.168.0.1, DNS 192.168.0.10
+!              Services > DNS: ON
+!                 A record  gmail.com   -> 8.8.8.9
+!                 A record  google.com  -> 8.8.8.9
+! gmail      : IP 192.168.0.20 /24, Gateway 192.168.0.1
+!              Services > EMAIL: SMTP ON, POP3 ON
+!                 User: tu / 123 ;  lam / 123
+! google.com : IP 192.168.0.30 /24, Gateway 192.168.0.1
+!              Services > HTTP ON, HTTPS ON
+
+!#####################################################################
+! PHẦN 3: BỘ QUỐC PHÒNG - HÀ NỘI
+!#####################################################################
+
+!=====================================================================
+! THIẾT BỊ: BQP-HN-R1  (Router 2911 - biên, uplink ISP-R1)
+!=====================================================================
+! LƯU Ý: Trên 2911 phải bật license securityk9 mới dùng được lệnh crypto.
+! Chạy lệnh "license boot module ..." bên dưới -> end -> write -> reload, sau đó mới dán phần còn lại.
+enable
+configure terminal
+!
+hostname BQP-HN-R1
+license boot module c2900 technology-package securityk9
+crypto isakmp policy 10
+ encr aes 256
+ authentication pre-share
+ group 5
+!
+crypto isakmp key BQP@lamlam123 address 201.165.4.2
+!
+crypto ipsec transform-set TS esp-aes 256 esp-sha-hmac
+!
+crypto map VPN 10 ipsec-isakmp
+ set peer 201.165.4.2
+ set transform-set TS
+ match address 110
+!
+interface Loopback0
+ ip address 10.1.0.1 255.255.255.255
+!
+interface Tunnel0
+ ip address 10.255.255.1 255.255.255.252
+ mtu 1476
+ tunnel source GigabitEthernet0/0
+ tunnel destination 201.165.4.2
+!
+interface GigabitEthernet0/0
+ description WAN_TO_ISP-R1
+ ip address 201.165.5.1 255.255.255.252
+ ip nat outside
+ crypto map VPN
+!
+interface GigabitEthernet0/1
+ description P2P_TO_HN-SwCore1_Gi1/0/1
+ ip address 10.1.255.1 255.255.255.252
+ ip ospf network point-to-point
+ ip nat inside
+!
+interface GigabitEthernet0/2
+ description P2P_TO_HN-SwCore_Gi1/0/2
+ ip address 10.1.255.5 255.255.255.252
+ ip ospf network point-to-point
+ ip nat inside
+!
+router eigrp 10
+ redistribute ospf 10 metric 100000 100 255 1 1500
+ network 10.255.255.0 0.0.0.3
+!
+router ospf 10
+ router-id 10.1.0.1
+ redistribute eigrp 10 subnets
+ network 10.1.0.1 0.0.0.0 area 0
+ network 10.1.255.0 0.0.0.3 area 0
+ network 10.1.255.4 0.0.0.3 area 0
+ default-information originate
+!
+ip nat inside source list 1 interface GigabitEthernet0/0 overload
+ip route 0.0.0.0 0.0.0.0 201.165.5.2
+ip route 201.165.4.2 255.255.255.255 201.165.5.2
+access-list 1 permit 10.1.0.0 0.0.255.255
+access-list 110 permit gre host 201.165.5.1 host 201.165.4.2
+end
+write memory
+
+!=====================================================================
+! THIẾT BỊ: BQP-HN-R2  (Router 2911 - biên, uplink ISP-R3)
+!=====================================================================
+! LƯU Ý: Trên 2911 phải bật license securityk9 mới dùng được lệnh crypto.
+! Chạy lệnh "license boot module ..." bên dưới -> end -> write -> reload, sau đó mới dán phần còn lại.
+enable
+configure terminal
+!
+hostname BQP-HN-R2
+license boot module c2900 technology-package securityk9
+crypto isakmp policy 10
+ encr aes 256
+ authentication pre-share
+ group 5
+!
+crypto isakmp key BQP@vpn123 address 201.165.4.2
+!
+crypto ipsec transform-set TS esp-aes 256 esp-sha-hmac
+!
+crypto map VPN 10 ipsec-isakmp
+ set peer 201.165.4.2
+ set transform-set TS
+ match address 110
+!
+interface Loopback0
+ ip address 10.1.0.2 255.255.255.255
+!
+interface Tunnel1
+ ip address 10.255.255.5 255.255.255.252
+ mtu 1476
+ tunnel source GigabitEthernet0/0
+ tunnel destination 201.165.4.2
+!
+interface GigabitEthernet0/0
+ description WAN_TO_ISP-R3
+ ip address 201.165.6.1 255.255.255.252
+ ip nat outside
+ crypto map VPN
+!
+interface GigabitEthernet0/1
+ description P2P_TO_HN-SwCore1_Gi1/0/2
+ ip address 10.1.255.9 255.255.255.252
+ ip ospf network point-to-point
+ ip nat inside
+!
+interface GigabitEthernet0/2
+ description P2P_TO_HN-SwCore_Gi1/0/1
+ ip address 10.1.255.13 255.255.255.252
+ ip ospf network point-to-point
+ ip nat inside
+!
+router eigrp 10
+ redistribute ospf 10 metric 100000 100 255 1 1500
+ network 10.255.255.4 0.0.0.3
+!
+router ospf 10
+ router-id 10.1.0.2
+ redistribute eigrp 10 subnets
+ network 10.1.0.2 0.0.0.0 area 0
+ network 10.1.255.8 0.0.0.3 area 0
+ network 10.1.255.12 0.0.0.3 area 0
+!
+ip nat inside source list 1 interface GigabitEthernet0/0 overload
+ip route 0.0.0.0 0.0.0.0 201.165.6.2
+ip route 201.165.4.2 255.255.255.255 201.165.6.2
+access-list 1 permit 10.1.0.0 0.0.255.255
+access-list 110 permit gre host 201.165.6.1 host 201.165.4.2
+end
+write memory
+
+!=====================================================================
+! THIẾT BỊ: HN-SwCore1  (Multilayer Switch 3650 - Core 1 (HSRP active VLAN 10, 99; DHCP server))
+!=====================================================================
+enable
+configure terminal
+!
+hostname HN-SwCore1
+vlan 10
+ name PC_HN_1
+vlan 20
+ name PC_HN_2
+vlan 99
+ name MGMT
+!
+ip dhcp excluded-address 10.1.10.1 10.1.10.10
+ip dhcp excluded-address 10.1.20.1 10.1.20.10
+ip dhcp pool VLAN10
+ network 10.1.10.0 255.255.255.0
+ default-router 10.1.10.1
+ dns-server 8.8.8.8
+!
+ip dhcp pool VLAN20
+ network 10.1.20.0 255.255.255.0
+ default-router 10.1.20.1
+ dns-server 8.8.8.8
+!
+ip routing
+no ip domain-lookup
+spanning-tree mode rapid-pvst
+spanning-tree vlan 10,99 priority 24576
+spanning-tree vlan 20 priority 28672
+interface Loopback0
+ ip address 10.1.0.3 255.255.255.255
+!
+interface Port-channel1
+ switchport trunk allowed vlan 10,20,99
+ switchport mode trunk
+!
+interface GigabitEthernet1/0/1
+ no switchport
+ ip address 10.1.255.2 255.255.255.252
+ ip ospf network point-to-point
+!
+interface GigabitEthernet1/0/2
+ no switchport
+ ip address 10.1.255.10 255.255.255.252
+ ip ospf network point-to-point
+!
+interface range Gi1/0/3 - 4
+ description ETHERCHANNEL_TO_HN-SwCore
+ switchport trunk allowed vlan 10,20,99
+ switchport mode trunk
+ channel-group 1 mode active
+!
+interface range Gi1/0/5 - 6
+ description TRUNK_TO_ACCESS
+ switchport trunk allowed vlan 10,20,99
+ switchport mode trunk
+!
+interface Vlan10
+ ip address 10.1.10.2 255.255.255.0
+ standby 10 ip 10.1.10.1
+ standby 10 priority 110
+ standby 10 preempt
+!
+interface Vlan20
+ ip address 10.1.20.2 255.255.255.0
+ standby 20 ip 10.1.20.1
+ standby 20 priority 90
+ standby 20 preempt
+!
+interface Vlan99
+ ip address 10.1.99.2 255.255.255.0
+ standby 99 ip 10.1.99.1
+ standby 99 priority 110
+ standby 99 preempt
+!
+router ospf 10
+ router-id 10.1.0.3
+ passive-interface Vlan10
+ passive-interface Vlan20
+ passive-interface Vlan99
+ network 10.1.0.3 0.0.0.0 area 0
+ network 10.1.255.0 0.0.0.3 area 0
+ network 10.1.255.8 0.0.0.3 area 0
+ network 10.1.10.0 0.0.0.255 area 0
+ network 10.1.20.0 0.0.0.255 area 0
+ network 10.1.99.0 0.0.0.255 area 0
+!
+end
+write memory
+
+!=====================================================================
+! THIẾT BỊ: HN-SwCore  (Multilayer Switch 3650 - Core 2 (HSRP active VLAN 20))
+!=====================================================================
+enable
+configure terminal
+!
+hostname HN-SwCore
+vlan 10
+ name PC_HN_1
+vlan 20
+ name PC_HN_2
+vlan 99
+ name MGMT
+!
+ip routing
+no ip domain-lookup
+spanning-tree mode rapid-pvst
+spanning-tree vlan 20 priority 24576
+spanning-tree vlan 10,99 priority 28672
+interface Loopback0
+ ip address 10.1.0.4 255.255.255.255
+!
+interface Port-channel1
+ switchport trunk allowed vlan 10,20,99
+ switchport mode trunk
+!
+interface GigabitEthernet1/0/1
+ no switchport
+ ip address 10.1.255.14 255.255.255.252
+ ip ospf network point-to-point
+!
+interface GigabitEthernet1/0/2
+ no switchport
+ ip address 10.1.255.6 255.255.255.252
+ ip ospf network point-to-point
+!
+interface range Gi1/0/3 - 4
+ description ETHERCHANNEL_TO_HN-SwCore1
+ switchport trunk allowed vlan 10,20,99
+ switchport mode trunk
+ channel-group 1 mode active
+!
+interface range Gi1/0/5 - 6
+ description TRUNK_TO_ACCESS
+ switchport trunk allowed vlan 10,20,99
+ switchport mode trunk
+!
+interface Vlan10
+ ip address 10.1.10.3 255.255.255.0
+ standby 10 ip 10.1.10.1
+ standby 10 priority 90
+ standby 10 preempt
+!
+interface Vlan20
+ ip address 10.1.20.3 255.255.255.0
+ standby 20 ip 10.1.20.1
+ standby 20 priority 110
+ standby 20 preempt
+!
+interface Vlan99
+ ip address 10.1.99.3 255.255.255.0
+ standby 99 ip 10.1.99.1
+ standby 99 priority 90
+ standby 99 preempt
+!
+router ospf 10
+ router-id 10.1.0.4
+ passive-interface Vlan10
+ passive-interface Vlan20
+ passive-interface Vlan99
+ network 10.1.0.4 0.0.0.0 area 0
+ network 10.1.255.4 0.0.0.3 area 0
+ network 10.1.255.12 0.0.0.3 area 0
+ network 10.1.10.0 0.0.0.255 area 0
+ network 10.1.20.0 0.0.0.255 area 0
+ network 10.1.99.0 0.0.0.255 area 0
+!
+end
+write memory
+
+!=====================================================================
+! THIẾT BỊ: HN-SwAcc1  (Switch 2960 - Access VLAN 10)
+!=====================================================================
+enable
+configure terminal
+!
+hostname HN-SwAcc1
+vlan 10
+ name PC_HN_1
+vlan 20
+ name PC_HN_2
+vlan 99
+ name MGMT
+!
+no ip domain-lookup
+spanning-tree mode rapid-pvst
+interface range Fa0/1 - 2
+ description UPLINK_TO_CORE
+ switchport trunk allowed vlan 10,20,99
+ switchport mode trunk
+!
+interface range Fa0/3 - 24
+ switchport access vlan 10
+ switchport mode access
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+!
+interface Vlan99
+ ip address 10.1.99.11 255.255.255.0
+!
+ip default-gateway 10.1.99.1
+end
+write memory
+
+!=====================================================================
+! THIẾT BỊ: HN-SwAcc2  (Switch 2960 - Access VLAN 20)
+!=====================================================================
+enable
+configure terminal
+!
+hostname HN-SwAcc2
+vlan 10
+ name PC_HN_1
+vlan 20
+ name PC_HN_2
+vlan 99
+ name MGMT
+!
+no ip domain-lookup
+spanning-tree mode rapid-pvst
+interface range Fa0/1 - 2
+ description UPLINK_TO_CORE
+ switchport trunk allowed vlan 10,20,99
+ switchport mode trunk
+!
+interface range Fa0/3 - 24
+ switchport access vlan 20
+ switchport mode access
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+!
+interface Vlan99
+ ip address 10.1.99.12 255.255.255.0
+!
+ip default-gateway 10.1.99.1
+end
+write memory
+
+!#####################################################################
+! PHẦN 4: BỘ QUỐC PHÒNG - BẮC GIANG
+!#####################################################################
+
+!=====================================================================
+! THIẾT BỊ: BQP-BG-R1  (Router 2911 - biên, uplink ISP-R2, DHCP LAN)
+!=====================================================================
+! LƯU Ý: Trên 2911 phải bật license securityk9 mới dùng được lệnh crypto.
+! Chạy lệnh "license boot module ..." bên dưới -> end -> write -> reload, sau đó mới dán phần còn lại.
+enable
+configure terminal
+!
+hostname BQP-BG-R1
+ip dhcp excluded-address 10.2.10.1 10.2.10.10
+ip dhcp pool LAN_BG
+ network 10.2.10.0 255.255.255.0
+ default-router 10.2.10.1
+ dns-server 8.8.8.8
+!
+license boot module c2900 technology-package securityk9
+crypto isakmp policy 10
+ encr aes 256
+ authentication pre-share
+ group 5
+!
+crypto isakmp key BQP@vpn123 address 201.165.5.1
+!
+crypto isakmp key BQP@vpn123 address 201.165.6.1
+!
+crypto ipsec transform-set TS esp-aes 256 esp-sha-hmac
+!
+crypto map VPN 10 ipsec-isakmp
+ set peer 201.165.5.1
+ set transform-set TS
+ match address 110
+!
+crypto map VPN 20 ipsec-isakmp
+ set peer 201.165.6.1
+ set transform-set TS
+ match address 120
+!
+interface Tunnel0
+ ip address 10.255.255.2 255.255.255.252
+ mtu 1476
+ tunnel source GigabitEthernet0/0
+ tunnel destination 201.165.5.1
+!
+interface Tunnel1
+ ip address 10.255.255.6 255.255.255.252
+ mtu 1476
+ tunnel source GigabitEthernet0/0
+ tunnel destination 201.165.6.1
+!
+interface GigabitEthernet0/0
+ description WAN_TO_ISP-R2
+ ip address 201.165.4.2 255.255.255.252
+ ip nat outside
+ crypto map VPN
+!
+interface GigabitEthernet0/1
+ description LAN_BAC_GIANG
+ ip address 10.2.10.1 255.255.255.0
+ ip nat inside
+!
+interface GigabitEthernet0/2
+ no ip address
+ shutdown
+!
+router eigrp 10
+ passive-interface GigabitEthernet0/1
+ network 10.255.255.0 0.0.0.3
+ network 10.255.255.4 0.0.0.3
+ network 10.2.10.0 0.0.0.255
+!
+ip nat inside source list 1 interface GigabitEthernet0/0 overload
+ip route 0.0.0.0 0.0.0.0 201.165.4.1
+ip route 201.165.5.1 255.255.255.255 201.165.4.1
+ip route 201.165.6.1 255.255.255.255 201.165.4.1
+access-list 1 permit 10.2.0.0 0.0.255.255
+access-list 110 permit gre host 201.165.4.2 host 201.165.5.1
+access-list 120 permit gre host 201.165.4.2 host 201.165.6.1
+end
+write memory
+
+!=====================================================================
+! THIẾT BỊ: Switch2  (Switch 2960 - BG-SwAcc)
+!=====================================================================
+enable
+configure terminal
+!
+hostname BG-SwAcc
+no ip domain-lookup
+interface range Fa0/2 - 24
+ switchport mode access
+ spanning-tree portfast
+!
+end
+write memory
+
+!=====================================================================
+! PC (cấu hình bằng GUI - Desktop > IP Configuration)
+!=====================================================================
+! PC0 (HN-SwAcc1 Fa0/3, VLAN 10) : DHCP  -> nhận 10.1.10.x, GW 10.1.10.1, DNS 8.8.8.8
+! PC1 (HN-SwAcc2 Fa0/3, VLAN 20) : DHCP  -> nhận 10.1.20.x, GW 10.1.20.1, DNS 8.8.8.8
+! PC2 (BG-SwAcc Fa0/2)           : DHCP  -> nhận 10.2.10.x, GW 10.2.10.1, DNS 8.8.8.8
+
+! ======================= KIỂM TRA =======================
+! show ip bgp summary / show ip bgp            (ISP)
+! show ip nat translations                     (Google-R1, router BQP)
+! show crypto isakmp sa / show crypto ipsec sa (VPN)
+! show ip eigrp neighbors / show ip ospf neighbor
+! show standby brief / show etherchannel summary / show spanning-tree (core HN)
+! Từ PC: ping 8.8.8.8, nslookup google.com, trình duyệt https://google.com
